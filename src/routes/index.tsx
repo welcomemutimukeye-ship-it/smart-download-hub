@@ -134,7 +134,7 @@ function Index() {
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          <SideBtn active={filter === "All"} onClick={() => setFilter("All")} icon={ArrowDownToLine} label="All Downloads" count={SEED.length} />
+          <SideBtn active={filter === "All"} onClick={() => setFilter("All")} icon={ArrowDownToLine} label="All Downloads" count={items.length} />
           <Section label="Categories" />
           {CATEGORIES.slice(1).map((c) => (
             <SideBtn
@@ -143,7 +143,7 @@ function Index() {
               onClick={() => setFilter(c.key)}
               icon={c.icon}
               label={c.label}
-              count={SEED.filter((r) => r.category === c.key).length}
+              count={items.filter((r) => r.category === c.key).length}
             />
           ))}
           <Section label="Status" />
@@ -156,11 +156,12 @@ function Index() {
               label={s.label}
               count={
                 s.key === "Finished"
-                  ? SEED.filter((r) => r.status === "Complete").length
-                  : SEED.filter((r) => r.status !== "Complete").length
+                  ? items.filter((r) => r.status === "Complete").length
+                  : items.filter((r) => r.status !== "Complete").length
               }
             />
           ))}
+
         </nav>
 
         <div className="p-4 border-t border-zinc-900">
