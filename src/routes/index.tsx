@@ -630,3 +630,181 @@ function LanDialog({ onClose }: { onClose: () => void }) {
     </Modal>
   );
 }
+
+function SettingsDialog({
+  prefs, onSave, onClose,
+}: { prefs: Prefs; onSave: (p: Prefs) => void; onClose: () => void }) {
+  const [draft, setDraft] = useState<Prefs>(prefs);
+  const update = <K extends keyof Prefs>(k: K, v: Prefs[K]) => setDraft((d) => ({ ...d, [k]: v }));
+  const updateRule = (id: string, patch: Partial<CategoryRule>) =>
+    setDraft((d) => ({ ...d, rules: d.rules.map((r) => (r.id === id ? { ...r, ...patch } : r)) }));
+  const removeRule = (id: string) =>
+    setDraft((d) => ({ ...d, rules: d.rules.filter((r) => r.id !== id) }));
+  const addRule = () =>
+    setDraft((d) => ({ ...d, rules: [...d.rules, { id: `r_${Date.now()}`, pattern: "", category: "Programs" }] }));
+
+  return (
+    <Modal title="Options & Preferences" onClose={onClose}>
+      <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+        {/* Downloads */}
+        <Section2 icon={Layers} label="Downloads">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Default segments">
+              <select
+                value={draft.segments}
+                onChange={(e) => update("segments", Number(e.target.value) as Prefs["segments"])}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+              >
+                <option value={8}>8</option><option value={16}>16</option><option value={32}>32</option>
+              </select>
+            </Field>
+            <Field label="Max concurrent">
+              <input
+                type="number" min={1} max={16}
+                value={draft.maxConcurrent}
+                onChange={(e) => update("maxConcurrent", Math.max(1, Math.min(16, Number(e.target.value) || 1)))}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+              />
+            </Field>
+          </div>
+          <Field label="Download folder">
+            <div className="flex items-center gap-2">
+              <Folder className="size-3.5 text-zinc-500" />
+              <input
+                value={draft.downloadDir}
+                onChange={(e) => update("downloadDir", e.target.value)}
+                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+              />
+            </div>
+          </Field>
+          <Toggle label="Auto-start new downloads" checked={draft.autoStart} onChange={(v) => update("autoStart", v)} />
+          <Toggle icon={Bell} label="Notify when a download finishes" checked={draft.notifyOnFinish} onChange={(v) => update("notifyOnFinish", v)} />
+        </Section2>
+
+        {/* Scheduling */}
+        <Section2 icon={CalendarClock} label="Scheduling">
+          <Toggle label="Restrict downloading to a time window" checked={draft.scheduleEnabled} onChange={(v) => update("scheduleEnabled", v)} />
+          <div className={`grid grid-cols-2 gap-3 transition-opacity ${draft.scheduleEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
+            <Field label="Start time">
+              <input
+                type="time"
+                value={draft.scheduleStart}
+                onChange={(e) => update("scheduleStart", e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+              />
+            </Field>
+            <Field label="End time">
+              <input
+                type="time"
+                value={draft.scheduleEnd}
+                onChange={(e) => update("scheduleEnd", e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+              />
+            </Field>
+          </div>
+        </Section2>
+
+        {/* Category rules */}
+        <Section2 icon={Archive} label="Category rules">
+          <p className="text-[11px] text-zinc-500">
+            Comma-separated extensions. New downloads are auto-sorted into the first matching category.
+          </p>
+          <div className="space-y-2">
+            {draft.rules.map((r) => (
+              <div key={r.id} className="grid grid-cols-[1fr_140px_auto] gap-2">
+                <input
+                  value={r.pattern}
+                  onChange={(e) => updateRule(r.id, { pattern: e.target.value })}
+                  placeholder=".ext1,.ext2"
+                  className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                />
+                <select
+                  value={r.category}
+                  onChange={(e) => updateRule(r.id, { category: e.target.value })}
+                  className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                >
+                  <option>Compressed</option><option>Documents</option><option>Music</option><option>Programs</option><option>Video</option>
+                </select>
+                <button
+                  onClick={() => removeRule(r.id)}
+                  className="px-2 text-zinc-500 hover:text-red-400 transition-colors"
+                  aria-label="Remove rule"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={addRule}
+            className="text-[11px] font-mono uppercase tracking-wider text-brand hover:underline flex items-center gap-1.5"
+          >
+            <Plus className="size-3" /> Add rule
+          </button>
+        </Section2>
+
+        <div className="flex items-center justify-between gap-2 pt-3 border-t border-zinc-900">
+          <button
+            onClick={() => setDraft(DEFAULT_PREFS)}
+            className="text-[12px] text-zinc-400 hover:text-zinc-200 font-medium flex items-center gap-1.5"
+          >
+            <RotateCcw className="size-3.5" /> Reset to defaults
+          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200">Cancel</button>
+            <button
+              onClick={() => onSave(draft)}
+              className="bg-brand text-zinc-950 px-4 py-2 rounded-md text-sm font-semibold ring-1 ring-brand hover:bg-brand/90 flex items-center gap-1.5"
+            >
+              <Save className="size-3.5" /> Save preferences
+            </button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function Section2({ icon: Icon, label, children }: { icon: any; label: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 border-b border-zinc-900 pb-2">
+        <Icon className="size-3.5 text-brand" />
+        {label}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function Toggle({
+  label, checked, onChange, icon: Icon,
+}: { label: string; checked: boolean; onChange: (v: boolean) => void; icon?: any }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="w-full flex items-center justify-between bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2.5 hover:border-zinc-700 transition-colors"
+    >
+      <span className="flex items-center gap-2 text-[12px] text-zinc-300">
+        {Icon && <Icon className="size-3.5 text-zinc-500" />}
+        {label}
+      </span>
+      <span className={`w-8 h-4 rounded-full relative transition-colors ${checked ? "bg-brand" : "bg-zinc-700"}`}>
+        <span
+          className={`absolute top-0.5 size-3 rounded-full bg-zinc-100 transition-all ${checked ? "left-4" : "left-0.5"}`}
+        />
+      </span>
+    </button>
+  );
+}
+
