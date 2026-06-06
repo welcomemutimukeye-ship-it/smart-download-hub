@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus, Play, Square, Trash2, Settings, Share2, X, Scissors,
   Archive, FileText, Music, Package, Video, CheckCircle2, Clock,
   Search, Cpu, HardDrive, Wifi, ArrowDownToLine, ArrowUpFromLine,
+  Save, RotateCcw, Folder, Bell, CalendarClock, Layers,
 } from "lucide-react";
 import trimPreview from "@/assets/trim-preview.jpg";
+import { usePrefs, loadQueue, saveQueue, DEFAULT_PREFS, type Prefs, type CategoryRule } from "@/lib/forge-storage";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
