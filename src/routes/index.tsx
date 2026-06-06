@@ -88,17 +88,36 @@ function Index() {
   const [trimItem, setTrimItem] = useState<DLItem | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [lanOpen, setLanOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [prefs, setPrefs] = usePrefs();
+
+  // Queue persisted to localStorage; hydrate after mount to avoid SSR mismatch.
+  const [items, setItems] = useState<DLItem[]>(SEED);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setItems(loadQueue<DLItem>(SEED));
+    setHydrated(true);
+  }, []);
+  useEffect(() => { if (hydrated) saveQueue(items); }, [items, hydrated]);
 
   const rows = useMemo(() => {
-    return SEED.filter((r) => {
+    return items.filter((r) => {
       if (filter === "All") return true;
       if (filter === "Finished") return r.status === "Complete";
       if (filter === "Unfinished") return r.status !== "Complete";
       return r.category === filter;
     }).filter((r) => r.name.toLowerCase().includes(search.toLowerCase()));
-  }, [filter, search]);
+  }, [items, filter, search]);
 
-  const totalSpeed = SEED.filter((r) => r.status === "Downloading").reduce((a, b) => a + b.speedKBs, 0);
+  const totalSpeed = items.filter((r) => r.status === "Downloading").reduce((a, b) => a + b.speedKBs, 0);
+
+  function handleAdd(newItem: DLItem) {
+    setItems((prev) => [newItem, ...prev]);
+  }
+  function handleClearFinished() {
+    setItems((prev) => prev.filter((r) => r.status !== "Complete"));
+  }
+
 
   return (
     <div className="flex h-screen w-full bg-surface font-sans text-zinc-200 overflow-hidden">
