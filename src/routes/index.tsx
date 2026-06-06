@@ -193,7 +193,7 @@ function Index() {
             <div className="w-px h-6 bg-zinc-800 mx-2" />
             <ToolBtn icon={Play} label="Resume" />
             <ToolBtn icon={Square} label="Stop" />
-            <ToolBtn icon={Trash2} label="Delete" danger />
+            <ToolBtn icon={Trash2} label="Clear Finished" danger onClick={handleClearFinished} />
           </div>
 
           <div className="flex items-center gap-3">
@@ -206,7 +206,10 @@ function Index() {
                 className="bg-zinc-900/80 border border-zinc-800 text-[12px] rounded-md pl-7 pr-3 py-1.5 w-56 focus:outline-none focus:ring-1 focus:ring-brand placeholder:text-zinc-600"
               />
             </div>
-            <button className="text-zinc-400 hover:text-zinc-100 text-[13px] font-medium flex items-center gap-1.5">
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="text-zinc-400 hover:text-zinc-100 text-[13px] font-medium flex items-center gap-1.5"
+            >
               <Settings className="size-3.5" /> Options
             </button>
             <button
@@ -217,6 +220,7 @@ function Index() {
             </button>
           </div>
         </header>
+
 
         {/* Table */}
         <div className="flex-1 overflow-auto">
