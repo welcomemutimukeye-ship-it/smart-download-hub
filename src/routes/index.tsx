@@ -296,19 +296,27 @@ function Index() {
             <span className="flex items-center gap-1.5"><Cpu className="size-3" /> 8 threads / segment</span>
           </div>
           <div className="flex items-center gap-4">
-            <span>Active: {SEED.filter((r) => r.status === "Downloading").length}</span>
-            <span>Queued: {SEED.filter((r) => r.status === "Queued").length}</span>
+            <span>Active: {items.filter((r) => r.status === "Downloading").length}</span>
+            <span>Queued: {items.filter((r) => r.status === "Queued").length}</span>
             <span className="flex items-center gap-1.5"><HardDrive className="size-3 text-brand" /> 124.2 GB Free</span>
           </div>
         </footer>
       </main>
 
       {trimOpen && trimItem && <TrimDialog item={trimItem} onClose={() => setTrimOpen(false)} />}
-      {addOpen && <AddDialog onClose={() => setAddOpen(false)} />}
+      {addOpen && <AddDialog prefs={prefs} onAdd={handleAdd} onClose={() => setAddOpen(false)} />}
       {lanOpen && <LanDialog onClose={() => setLanOpen(false)} />}
+      {settingsOpen && (
+        <SettingsDialog
+          prefs={prefs}
+          onSave={(p) => { setPrefs(() => p); setSettingsOpen(false); }}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </div>
   );
 }
+
 
 function Section({ label }: { label: string }) {
   return <div className="pt-4 pb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{label}</div>;
