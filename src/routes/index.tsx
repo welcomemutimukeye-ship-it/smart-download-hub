@@ -481,8 +481,44 @@ function Stat({ label, value, brand, highlight }: { label: string; value: string
   );
 }
 
-function AddDialog({ onClose }: { onClose: () => void }) {
+function detectCategory(name: string, rules: CategoryRule[]): DLItem["category"] {
+  const lower = name.toLowerCase();
+  for (const rule of rules) {
+    const exts = rule.pattern.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean);
+    if (exts.some((ext) => lower.endsWith(ext))) {
+      return rule.category as DLItem["category"];
+    }
+  }
+  return "Programs";
+}
+
+function AddDialog({ prefs, onAdd, onClose }: { prefs: Prefs; onAdd: (item: DLItem) => void; onClose: () => void }) {
   const [url, setUrl] = useState("");
+  const [segments, setSegments] = useState<number>(prefs.segments);
+  const [category, setCategory] = useState<string>(prefs.defaultCategory);
+  const [schedule, setSchedule] = useState<string>("");
+
+  function submit() {
+    if (!url.trim()) return;
+    const name = url.split("/").pop()?.split("?")[0] || `download_${Date.now()}`;
+    const resolvedCategory =
+      category === "Auto-detect" ? detectCategory(name, prefs.rules) : (category as DLItem["category"]);
+    const scheduled = schedule && new Date(schedule).getTime() > Date.now();
+    const item: DLItem = {
+      id: `q_${Date.now()}`,
+      name,
+      category: resolvedCategory,
+      sizeMB: Math.round(50 + Math.random() * 1500),
+      status: scheduled ? "Queued" : prefs.autoStart ? "Downloading" : "Paused",
+      speedKBs: 0,
+      progress: 0,
+      etaSec: 0,
+      lastTry: scheduled ? new Date(schedule).toLocaleString() : new Date().toLocaleTimeString(),
+    };
+    onAdd(item);
+    onClose();
+  }
+
   return (
     <Modal title="Add New Download" onClose={onClose}>
       <div className="p-6 space-y-5">
@@ -498,26 +534,40 @@ function AddDialog({ onClose }: { onClose: () => void }) {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <label className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Segments</label>
-            <select className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono">
-              <option>8</option><option>16</option><option>32</option>
+            <select
+              value={segments}
+              onChange={(e) => setSegments(Number(e.target.value))}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+            >
+              <option value={8}>8</option><option value={16}>16</option><option value={32}>32</option>
             </select>
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Category (AI sorted)</label>
-            <select className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono">
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+            >
               <option>Auto-detect</option><option>Compressed</option><option>Documents</option><option>Music</option><option>Programs</option><option>Video</option>
             </select>
           </div>
         </div>
         <div className="flex items-center justify-between bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2.5">
           <span className="text-[11px] text-zinc-400">Schedule for later</span>
-          <input type="datetime-local" className="bg-transparent text-[11px] font-mono text-zinc-300 outline-none" />
+          <input
+            type="datetime-local"
+            value={schedule}
+            onChange={(e) => setSchedule(e.target.value)}
+            className="bg-transparent text-[11px] font-mono text-zinc-300 outline-none"
+          />
         </div>
         <div className="flex justify-end gap-2 pt-2 border-t border-zinc-900">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200">Cancel</button>
-          <button onClick={onClose} className="bg-brand text-zinc-950 px-4 py-2 rounded-md text-sm font-semibold ring-1 ring-brand hover:bg-brand/90 flex items-center gap-1.5">
+          <button onClick={submit} className="bg-brand text-zinc-950 px-4 py-2 rounded-md text-sm font-semibold ring-1 ring-brand hover:bg-brand/90 flex items-center gap-1.5">
             <Plus className="size-3.5" /> Queue Download
           </button>
+
         </div>
       </div>
     </Modal>
