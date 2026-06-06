@@ -335,14 +335,15 @@ function SideBtn({
   );
 }
 
-function ToolBtn({ icon: Icon, label, danger }: { icon: any; label: string; danger?: boolean }) {
+function ToolBtn({ icon: Icon, label, danger, onClick }: { icon: any; label: string; danger?: boolean; onClick?: () => void }) {
   return (
-    <button className={`text-zinc-400 hover:text-zinc-100 px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition-colors hover:bg-zinc-800/50 ${danger ? "hover:text-red-400" : ""}`}>
+    <button onClick={onClick} className={`text-zinc-400 hover:text-zinc-100 px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition-colors hover:bg-zinc-800/50 ${danger ? "hover:text-red-400" : ""}`}>
       <Icon className="size-3.5" />
       <span className="text-[13px] font-medium">{label}</span>
     </button>
   );
 }
+
 
 function StatusPill({ status }: { status: Status }) {
   const map: Record<Status, string> = {
