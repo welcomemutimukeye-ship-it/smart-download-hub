@@ -1,3 +1,9 @@
+---
+name: my-imported-project
+description: Local project imported into Lovable
+version: 1.0.0
+---
+
 # Project Skill
 
 ## Tech Stack
