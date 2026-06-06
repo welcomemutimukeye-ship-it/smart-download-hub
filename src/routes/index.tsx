@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus, Play, Square, Trash2, Settings, Share2, X, Scissors,
   Archive, FileText, Music, Package, Video, CheckCircle2, Clock,
   Search, Cpu, HardDrive, Wifi, ArrowDownToLine, ArrowUpFromLine,
+  Save, RotateCcw, Folder, Bell, CalendarClock, Layers,
 } from "lucide-react";
 import trimPreview from "@/assets/trim-preview.jpg";
+import { usePrefs, loadQueue, saveQueue, DEFAULT_PREFS, type Prefs, type CategoryRule } from "@/lib/forge-storage";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -85,17 +88,36 @@ function Index() {
   const [trimItem, setTrimItem] = useState<DLItem | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [lanOpen, setLanOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [prefs, setPrefs] = usePrefs();
+
+  // Queue persisted to localStorage; hydrate after mount to avoid SSR mismatch.
+  const [items, setItems] = useState<DLItem[]>(SEED);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setItems(loadQueue<DLItem>(SEED));
+    setHydrated(true);
+  }, []);
+  useEffect(() => { if (hydrated) saveQueue(items); }, [items, hydrated]);
 
   const rows = useMemo(() => {
-    return SEED.filter((r) => {
+    return items.filter((r) => {
       if (filter === "All") return true;
       if (filter === "Finished") return r.status === "Complete";
       if (filter === "Unfinished") return r.status !== "Complete";
       return r.category === filter;
     }).filter((r) => r.name.toLowerCase().includes(search.toLowerCase()));
-  }, [filter, search]);
+  }, [items, filter, search]);
 
-  const totalSpeed = SEED.filter((r) => r.status === "Downloading").reduce((a, b) => a + b.speedKBs, 0);
+  const totalSpeed = items.filter((r) => r.status === "Downloading").reduce((a, b) => a + b.speedKBs, 0);
+
+  function handleAdd(newItem: DLItem) {
+    setItems((prev) => [newItem, ...prev]);
+  }
+  function handleClearFinished() {
+    setItems((prev) => prev.filter((r) => r.status !== "Complete"));
+  }
+
 
   return (
     <div className="flex h-screen w-full bg-surface font-sans text-zinc-200 overflow-hidden">
@@ -112,7 +134,7 @@ function Index() {
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          <SideBtn active={filter === "All"} onClick={() => setFilter("All")} icon={ArrowDownToLine} label="All Downloads" count={SEED.length} />
+          <SideBtn active={filter === "All"} onClick={() => setFilter("All")} icon={ArrowDownToLine} label="All Downloads" count={items.length} />
           <Section label="Categories" />
           {CATEGORIES.slice(1).map((c) => (
             <SideBtn
@@ -121,7 +143,7 @@ function Index() {
               onClick={() => setFilter(c.key)}
               icon={c.icon}
               label={c.label}
-              count={SEED.filter((r) => r.category === c.key).length}
+              count={items.filter((r) => r.category === c.key).length}
             />
           ))}
           <Section label="Status" />
@@ -134,11 +156,12 @@ function Index() {
               label={s.label}
               count={
                 s.key === "Finished"
-                  ? SEED.filter((r) => r.status === "Complete").length
-                  : SEED.filter((r) => r.status !== "Complete").length
+                  ? items.filter((r) => r.status === "Complete").length
+                  : items.filter((r) => r.status !== "Complete").length
               }
             />
           ))}
+
         </nav>
 
         <div className="p-4 border-t border-zinc-900">
@@ -170,7 +193,7 @@ function Index() {
             <div className="w-px h-6 bg-zinc-800 mx-2" />
             <ToolBtn icon={Play} label="Resume" />
             <ToolBtn icon={Square} label="Stop" />
-            <ToolBtn icon={Trash2} label="Delete" danger />
+            <ToolBtn icon={Trash2} label="Clear Finished" danger onClick={handleClearFinished} />
           </div>
 
           <div className="flex items-center gap-3">
@@ -183,7 +206,10 @@ function Index() {
                 className="bg-zinc-900/80 border border-zinc-800 text-[12px] rounded-md pl-7 pr-3 py-1.5 w-56 focus:outline-none focus:ring-1 focus:ring-brand placeholder:text-zinc-600"
               />
             </div>
-            <button className="text-zinc-400 hover:text-zinc-100 text-[13px] font-medium flex items-center gap-1.5">
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="text-zinc-400 hover:text-zinc-100 text-[13px] font-medium flex items-center gap-1.5"
+            >
               <Settings className="size-3.5" /> Options
             </button>
             <button
@@ -194,6 +220,7 @@ function Index() {
             </button>
           </div>
         </header>
+
 
         {/* Table */}
         <div className="flex-1 overflow-auto">
@@ -269,19 +296,27 @@ function Index() {
             <span className="flex items-center gap-1.5"><Cpu className="size-3" /> 8 threads / segment</span>
           </div>
           <div className="flex items-center gap-4">
-            <span>Active: {SEED.filter((r) => r.status === "Downloading").length}</span>
-            <span>Queued: {SEED.filter((r) => r.status === "Queued").length}</span>
+            <span>Active: {items.filter((r) => r.status === "Downloading").length}</span>
+            <span>Queued: {items.filter((r) => r.status === "Queued").length}</span>
             <span className="flex items-center gap-1.5"><HardDrive className="size-3 text-brand" /> 124.2 GB Free</span>
           </div>
         </footer>
       </main>
 
       {trimOpen && trimItem && <TrimDialog item={trimItem} onClose={() => setTrimOpen(false)} />}
-      {addOpen && <AddDialog onClose={() => setAddOpen(false)} />}
+      {addOpen && <AddDialog prefs={prefs} onAdd={handleAdd} onClose={() => setAddOpen(false)} />}
       {lanOpen && <LanDialog onClose={() => setLanOpen(false)} />}
+      {settingsOpen && (
+        <SettingsDialog
+          prefs={prefs}
+          onSave={(p) => { setPrefs(() => p); setSettingsOpen(false); }}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
     </div>
   );
 }
+
 
 function Section({ label }: { label: string }) {
   return <div className="pt-4 pb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{label}</div>;
@@ -308,14 +343,15 @@ function SideBtn({
   );
 }
 
-function ToolBtn({ icon: Icon, label, danger }: { icon: any; label: string; danger?: boolean }) {
+function ToolBtn({ icon: Icon, label, danger, onClick }: { icon: any; label: string; danger?: boolean; onClick?: () => void }) {
   return (
-    <button className={`text-zinc-400 hover:text-zinc-100 px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition-colors hover:bg-zinc-800/50 ${danger ? "hover:text-red-400" : ""}`}>
+    <button onClick={onClick} className={`text-zinc-400 hover:text-zinc-100 px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition-colors hover:bg-zinc-800/50 ${danger ? "hover:text-red-400" : ""}`}>
       <Icon className="size-3.5" />
       <span className="text-[13px] font-medium">{label}</span>
     </button>
   );
 }
+
 
 function StatusPill({ status }: { status: Status }) {
   const map: Record<Status, string> = {
@@ -445,8 +481,44 @@ function Stat({ label, value, brand, highlight }: { label: string; value: string
   );
 }
 
-function AddDialog({ onClose }: { onClose: () => void }) {
+function detectCategory(name: string, rules: CategoryRule[]): DLItem["category"] {
+  const lower = name.toLowerCase();
+  for (const rule of rules) {
+    const exts = rule.pattern.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean);
+    if (exts.some((ext) => lower.endsWith(ext))) {
+      return rule.category as DLItem["category"];
+    }
+  }
+  return "Programs";
+}
+
+function AddDialog({ prefs, onAdd, onClose }: { prefs: Prefs; onAdd: (item: DLItem) => void; onClose: () => void }) {
   const [url, setUrl] = useState("");
+  const [segments, setSegments] = useState<number>(prefs.segments);
+  const [category, setCategory] = useState<string>(prefs.defaultCategory);
+  const [schedule, setSchedule] = useState<string>("");
+
+  function submit() {
+    if (!url.trim()) return;
+    const name = url.split("/").pop()?.split("?")[0] || `download_${Date.now()}`;
+    const resolvedCategory =
+      category === "Auto-detect" ? detectCategory(name, prefs.rules) : (category as DLItem["category"]);
+    const scheduled = schedule && new Date(schedule).getTime() > Date.now();
+    const item: DLItem = {
+      id: `q_${Date.now()}`,
+      name,
+      category: resolvedCategory,
+      sizeMB: Math.round(50 + Math.random() * 1500),
+      status: scheduled ? "Queued" : prefs.autoStart ? "Downloading" : "Paused",
+      speedKBs: 0,
+      progress: 0,
+      etaSec: 0,
+      lastTry: scheduled ? new Date(schedule).toLocaleString() : new Date().toLocaleTimeString(),
+    };
+    onAdd(item);
+    onClose();
+  }
+
   return (
     <Modal title="Add New Download" onClose={onClose}>
       <div className="p-6 space-y-5">
@@ -462,26 +534,40 @@ function AddDialog({ onClose }: { onClose: () => void }) {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <label className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Segments</label>
-            <select className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono">
-              <option>8</option><option>16</option><option>32</option>
+            <select
+              value={segments}
+              onChange={(e) => setSegments(Number(e.target.value))}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+            >
+              <option value={8}>8</option><option value={16}>16</option><option value={32}>32</option>
             </select>
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Category (AI sorted)</label>
-            <select className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono">
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+            >
               <option>Auto-detect</option><option>Compressed</option><option>Documents</option><option>Music</option><option>Programs</option><option>Video</option>
             </select>
           </div>
         </div>
         <div className="flex items-center justify-between bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2.5">
           <span className="text-[11px] text-zinc-400">Schedule for later</span>
-          <input type="datetime-local" className="bg-transparent text-[11px] font-mono text-zinc-300 outline-none" />
+          <input
+            type="datetime-local"
+            value={schedule}
+            onChange={(e) => setSchedule(e.target.value)}
+            className="bg-transparent text-[11px] font-mono text-zinc-300 outline-none"
+          />
         </div>
         <div className="flex justify-end gap-2 pt-2 border-t border-zinc-900">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200">Cancel</button>
-          <button onClick={onClose} className="bg-brand text-zinc-950 px-4 py-2 rounded-md text-sm font-semibold ring-1 ring-brand hover:bg-brand/90 flex items-center gap-1.5">
+          <button onClick={submit} className="bg-brand text-zinc-950 px-4 py-2 rounded-md text-sm font-semibold ring-1 ring-brand hover:bg-brand/90 flex items-center gap-1.5">
             <Plus className="size-3.5" /> Queue Download
           </button>
+
         </div>
       </div>
     </Modal>
@@ -544,3 +630,181 @@ function LanDialog({ onClose }: { onClose: () => void }) {
     </Modal>
   );
 }
+
+function SettingsDialog({
+  prefs, onSave, onClose,
+}: { prefs: Prefs; onSave: (p: Prefs) => void; onClose: () => void }) {
+  const [draft, setDraft] = useState<Prefs>(prefs);
+  const update = <K extends keyof Prefs>(k: K, v: Prefs[K]) => setDraft((d) => ({ ...d, [k]: v }));
+  const updateRule = (id: string, patch: Partial<CategoryRule>) =>
+    setDraft((d) => ({ ...d, rules: d.rules.map((r) => (r.id === id ? { ...r, ...patch } : r)) }));
+  const removeRule = (id: string) =>
+    setDraft((d) => ({ ...d, rules: d.rules.filter((r) => r.id !== id) }));
+  const addRule = () =>
+    setDraft((d) => ({ ...d, rules: [...d.rules, { id: `r_${Date.now()}`, pattern: "", category: "Programs" }] }));
+
+  return (
+    <Modal title="Options & Preferences" onClose={onClose}>
+      <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+        {/* Downloads */}
+        <Section2 icon={Layers} label="Downloads">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Default segments">
+              <select
+                value={draft.segments}
+                onChange={(e) => update("segments", Number(e.target.value) as Prefs["segments"])}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+              >
+                <option value={8}>8</option><option value={16}>16</option><option value={32}>32</option>
+              </select>
+            </Field>
+            <Field label="Max concurrent">
+              <input
+                type="number" min={1} max={16}
+                value={draft.maxConcurrent}
+                onChange={(e) => update("maxConcurrent", Math.max(1, Math.min(16, Number(e.target.value) || 1)))}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+              />
+            </Field>
+          </div>
+          <Field label="Download folder">
+            <div className="flex items-center gap-2">
+              <Folder className="size-3.5 text-zinc-500" />
+              <input
+                value={draft.downloadDir}
+                onChange={(e) => update("downloadDir", e.target.value)}
+                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+              />
+            </div>
+          </Field>
+          <Toggle label="Auto-start new downloads" checked={draft.autoStart} onChange={(v) => update("autoStart", v)} />
+          <Toggle icon={Bell} label="Notify when a download finishes" checked={draft.notifyOnFinish} onChange={(v) => update("notifyOnFinish", v)} />
+        </Section2>
+
+        {/* Scheduling */}
+        <Section2 icon={CalendarClock} label="Scheduling">
+          <Toggle label="Restrict downloading to a time window" checked={draft.scheduleEnabled} onChange={(v) => update("scheduleEnabled", v)} />
+          <div className={`grid grid-cols-2 gap-3 transition-opacity ${draft.scheduleEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
+            <Field label="Start time">
+              <input
+                type="time"
+                value={draft.scheduleStart}
+                onChange={(e) => update("scheduleStart", e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+              />
+            </Field>
+            <Field label="End time">
+              <input
+                type="time"
+                value={draft.scheduleEnd}
+                onChange={(e) => update("scheduleEnd", e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+              />
+            </Field>
+          </div>
+        </Section2>
+
+        {/* Category rules */}
+        <Section2 icon={Archive} label="Category rules">
+          <p className="text-[11px] text-zinc-500">
+            Comma-separated extensions. New downloads are auto-sorted into the first matching category.
+          </p>
+          <div className="space-y-2">
+            {draft.rules.map((r) => (
+              <div key={r.id} className="grid grid-cols-[1fr_140px_auto] gap-2">
+                <input
+                  value={r.pattern}
+                  onChange={(e) => updateRule(r.id, { pattern: e.target.value })}
+                  placeholder=".ext1,.ext2"
+                  className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                />
+                <select
+                  value={r.category}
+                  onChange={(e) => updateRule(r.id, { category: e.target.value })}
+                  className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                >
+                  <option>Compressed</option><option>Documents</option><option>Music</option><option>Programs</option><option>Video</option>
+                </select>
+                <button
+                  onClick={() => removeRule(r.id)}
+                  className="px-2 text-zinc-500 hover:text-red-400 transition-colors"
+                  aria-label="Remove rule"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={addRule}
+            className="text-[11px] font-mono uppercase tracking-wider text-brand hover:underline flex items-center gap-1.5"
+          >
+            <Plus className="size-3" /> Add rule
+          </button>
+        </Section2>
+
+        <div className="flex items-center justify-between gap-2 pt-3 border-t border-zinc-900">
+          <button
+            onClick={() => setDraft(DEFAULT_PREFS)}
+            className="text-[12px] text-zinc-400 hover:text-zinc-200 font-medium flex items-center gap-1.5"
+          >
+            <RotateCcw className="size-3.5" /> Reset to defaults
+          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200">Cancel</button>
+            <button
+              onClick={() => onSave(draft)}
+              className="bg-brand text-zinc-950 px-4 py-2 rounded-md text-sm font-semibold ring-1 ring-brand hover:bg-brand/90 flex items-center gap-1.5"
+            >
+              <Save className="size-3.5" /> Save preferences
+            </button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function Section2({ icon: Icon, label, children }: { icon: any; label: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 border-b border-zinc-900 pb-2">
+        <Icon className="size-3.5 text-brand" />
+        {label}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function Toggle({
+  label, checked, onChange, icon: Icon,
+}: { label: string; checked: boolean; onChange: (v: boolean) => void; icon?: any }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="w-full flex items-center justify-between bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2.5 hover:border-zinc-700 transition-colors"
+    >
+      <span className="flex items-center gap-2 text-[12px] text-zinc-300">
+        {Icon && <Icon className="size-3.5 text-zinc-500" />}
+        {label}
+      </span>
+      <span className={`w-8 h-4 rounded-full relative transition-colors ${checked ? "bg-brand" : "bg-zinc-700"}`}>
+        <span
+          className={`absolute top-0.5 size-3 rounded-full bg-zinc-100 transition-all ${checked ? "left-4" : "left-0.5"}`}
+        />
+      </span>
+    </button>
+  );
+}
+
